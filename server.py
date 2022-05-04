@@ -29,20 +29,23 @@ while(True):
 
         # Parse the clientMessage into its separate parts
         print("[*] Parsing clientMessage Header: ")
-        rows = clientMessage.splitlines()    # split the clientMessage into lines
+        rows = clientMessage.splitlines(True)    # split the clientMessage into lines
         parts = rows[0].split(' ')     # split the first line into parts
         method = parts[0]               # get the method
         version = parts[2]              # get the http version
         url = parts[1][1:]              # get the url
         x = len(url.split('/'))
         host = url.split('/')[0]        # get the host
-        if x > 1: path = url.split("/",1)[1]
-        else: path = host     # get the path
+        if x > 1: 
+            path = url.split("/",1)[1]
+        else: 
+            path = ''     # get the path
+            redirect = True
         filename = url.split('/')[-1]   # get the filename
         print("[*] Method: %s, Destination: %s, Version: %s" % (method, url, version))
 
         if method == "GET":
-            
+           
             # check if the file is in the cache
             if not os.path.exists('cache/' + filename):
                 print("\n[*] File not in cache")
@@ -53,10 +56,10 @@ while(True):
                 print("Hostname: %s\nURL: %s\nFilename: %s\n" % (host, path, filename))
 
                 # send the clientMessage to the server
-                serverMessage = clientMessage.splitlines()
-                serverMessage = ("GET /%s HTTP/1.1\r\nHost: %s\r\n\r\n" % (path, host))
-                serverSocket.send(serverMessage.encode())
-                print("[*] Message Sent to Server:\n%s[*] End of Message\n\n" % (serverMessage))
+                rows[0] = ("GET /%s HTTP/1.1\r\n" % (path))
+                rows[1] = ("Host: %s\r\n" % (host))
+                serverSocket.send((''.join(rows)).encode())
+                print("[*] Message Sent to Server:\n%s[*] End of Message\n\n" % (''.join(rows)))
                 
 
                 # receive the response from the server
@@ -65,7 +68,7 @@ while(True):
                 header = response.split("\r\n\r\n",1)[0]
                 lines = header.splitlines()    # split the clientMessage into lines
                 
-                # header is the first 8 lines
+                # header 
                 print("[*] Response Recieved from Server: \n%s\n[*] End of Header\n\n" % ('\n'.join(lines)))
 
                 # get components to write a response to the client
@@ -81,9 +84,13 @@ while(True):
                 elif status[1] == "403 Forbidden":
                     status[1] = "302 Found"
                 serverSocket.close()
-                # send the response to the client 
-                bytesResponse = ('\r\n'.join(lines)).encode()
-                clientSocket.send(bytesResponse)
+                # send the response to the client
+                if(redirect == True):
+                    clientSocket.send(("HTTP/1.1 302 Found\nLocation: http://" + host + "/" + path + "\n\n").encode())
+                    print("[*] Redirecting to: http://" + host + "/" + path)
+                else:
+                    bytesResponse = ('\r\n'.join(lines)).encode()
+                    clientSocket.send(bytesResponse)
                 proxyResponse = "\nHTTP/1.1 %s\nContent-Type: text/html; charset =UTF-8\n" % (status[1])
                 print("[*] Response header from Proxy to Client: %s\n[*] End of Header\n\n" % (proxyResponse)) 
                      
@@ -95,7 +102,7 @@ while(True):
 
                 # parse the response
                 lines = file.readlines()    # split into lines
-    
+                
 
                 # send the response to the client
                 
